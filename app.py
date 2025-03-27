@@ -47,12 +47,22 @@ staff_colors = {}
 def init_staff_colors():
     global staff_colors
     if not staff_colors:
+        # 为现有 Staff 表中的员工分配颜色
         for staff in Staff.query.all():
-            staff_colors[staff.name] = f'#{random.randint(0, 16777215):06x}'
-        schedules = Schedule.query.distinct(Schedule.staff_id).all()
-        for sched in schedules:
-            if sched.staff.name not in staff_colors:
-                staff_colors[sched.staff.name] = f'#{random.randint(0, 16777215):06x}'
+            r = random.randint(180, 255)
+            g = random.randint(180, 255)
+            b = random.randint(180, 255)
+            staff_colors[staff.name] = f'#{r:02x}{g:02x}{b:02x}'
+        # 获取 Schedule 中唯一的 staff_id 并确保对应员工有颜色
+        unique_staff_ids = db.session.query(Schedule.staff_id).distinct().all()
+        for staff_id_tuple in unique_staff_ids:
+            staff_id = staff_id_tuple[0]  # distinct 返回的是元组
+            staff = db.session.get(Staff, staff_id)  # 使用 db.session.get 替代 Staff.query.get
+            if staff and staff.name not in staff_colors:
+                r = random.randint(180, 255)
+                g = random.randint(180, 255)
+                b = random.randint(180, 255)
+                staff_colors[staff.name] = f'#{r:02x}{g:02x}{b:02x}'
     logging.info(f"Initialized staff colors: {staff_colors}")
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -158,7 +168,7 @@ def update_schedule():
             else:
                 new_staff_obj = Staff(name=new_staff)
                 db.session.add(new_staff_obj)
-                staff_colors[new_staff] = f'#{random.randint(0, 16777215):06x}'
+                staff_colors[new_staff] = f'#{random.randint(180, 255):02x}{random.randint(180, 255):02x}{random.randint(180, 255):02x}'
                 flash(f'已成功添加新员工 {new_staff}')
         db.session.commit()
         logging.info('排班更新成功')
