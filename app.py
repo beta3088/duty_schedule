@@ -153,9 +153,13 @@ def update_schedule():
                 staff_colors.pop(staff.name, None)
         new_staff = request.form.get('new_staff')
         if new_staff:
-            new_staff_obj = Staff(name=new_staff)
-            db.session.add(new_staff_obj)
-            staff_colors[new_staff] = f'#{random.randint(0, 16777215):06x}'
+            if Staff.query.filter_by(name=new_staff).first():
+                flash(f'员工 {new_staff} 已存在，无需重复添加')
+            else:
+                new_staff_obj = Staff(name=new_staff)
+                db.session.add(new_staff_obj)
+                staff_colors[new_staff] = f'#{random.randint(0, 16777215):06x}'
+                flash(f'已成功添加新员工 {new_staff}')
         db.session.commit()
         logging.info('排班更新成功')
         flash(f'排班更新完成，从 {start_date} 开始')
