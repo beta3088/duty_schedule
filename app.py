@@ -9,57 +9,52 @@ import calendar
 app = Flask(__name__)
 app.config.from_object('config.Config')
 
-# 启用 Jinja2 的 'do' 扩展
 app.jinja_env.add_extension('jinja2.ext.do')
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# 日志配置
 logging.basicConfig(filename='schedule_web.log', level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-# 用户模型
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(100), nullable=False)  # 测试环境明文
+    password = db.Column(db.String(100), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
 
-# 人员模型
 class Staff(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
 
-# 排班模型
 class Schedule(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.Date, nullable=False)
     staff_id = db.Column(db.Integer, db.ForeignKey('staff.id'), nullable=False)
     staff = db.relationship('Staff', backref='schedules')
 
-# 节假日模型
 class Holiday(db.Model):
     date = db.Column(db.Date, primary_key=True)
     is_workday = db.Column(db.Boolean, nullable=False)
 
 @login_manager.user_loader
 def load_user(user_id):
-    return db.session.get(User, int(user_id))  # 修改为 db.session.get()
+    return db.session.get(User, int(user_id))
 
-# 全局员工颜色映射
 staff_colors = {}
 
-# 初始化员工颜色
 def init_staff_colors():
     global staff_colors
     if not staff_colors:
         for staff in Staff.query.all():
             staff_colors[staff.name] = f'#{random.randint(0, 16777215):06x}'
+        schedules = Schedule.query.distinct(Schedule.staff_id).all()
+        for sched in schedules:
+            if sched.staff.name not in staff_colors:
+                staff_colors[sched.staff.name] = f'#{random.randint(0, 16777215):06x}'
     logging.info(f"Initialized staff colors: {staff_colors}")
 
-# 登录页面（仅管理员）
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -76,19 +71,16 @@ def login():
             return render_template('login.html'), 401
     return render_template('login.html')
 
-# 退出登录
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
     return redirect(url_for('index'))
 
-# 主页 - 日历视图（无需登录）
 @app.route('/', methods=['GET'])
 def index():
     year = int(request.args.get('year', date.today().year))
     schedules = Schedule.query.filter(Schedule.date.between(f'{year}-01-01', f'{year}-12-31')).all()
-    # 初始化员工颜色
     init_staff_colors()
     monthly_schedules = {}
     monthly_calendars = {}
@@ -96,7 +88,7 @@ def index():
         monthly_schedules[month] = {
             sched.date.day: {
                 'name': sched.staff.name,
-                'color': staff_colors[sched.staff.name]  # 使用固定的员工颜色
+                'color': staff_colors[sched.staff.name]
             } for sched in schedules if sched.date.month == month
         }
         monthly_calendars[month] = calendar.monthcalendar(year, month)
@@ -106,7 +98,6 @@ def index():
                          monthly_calendars=monthly_calendars, year=year, 
                          is_admin=is_admin_user)
 
-# 初始化排班（仅管理员）
 @app.route('/init_schedule', methods=['POST'])
 @login_required
 def init_schedule():
@@ -142,7 +133,6 @@ def init_schedule():
     flash(f'{year} 年排班初始化完成')
     return redirect(url_for('index', year=year))
 
-# 更新排班（仅管理员）
 @app.route('/update', methods=['GET', 'POST'])
 @login_required
 def update_schedule():
@@ -160,19 +150,18 @@ def update_schedule():
             if staff:
                 Schedule.query.filter(Schedule.staff_id == staff.id, Schedule.date >= start_date).delete()
                 db.session.delete(staff)
-                staff_colors.pop(staff.name, None)  # 删除员工时移除颜色
+                staff_colors.pop(staff.name, None)
         new_staff = request.form.get('new_staff')
         if new_staff:
             new_staff_obj = Staff(name=new_staff)
             db.session.add(new_staff_obj)
-            staff_colors[new_staff] = f'#{random.randint(0, 16777215):06x}'  # 为新员工分配颜色
+            staff_colors[new_staff] = f'#{random.randint(0, 16777215):06x}'
         db.session.commit()
         logging.info('排班更新成功')
         flash(f'排班更新完成，从 {start_date} 开始')
         return redirect(url_for('index'))
     return render_template('update.html', staff=Staff.query.all())
 
-# 拖拽对调（仅管理员）
 @app.route('/swap', methods=['POST'])
 @login_required
 def swap():
