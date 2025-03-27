@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>更新排班</h2>
+    <form method="POST">
+        <div class="mb-3">
+            <label for="start_date" class="form-label">开始日期</label>
+            <input type="date" class="form-control" id="start_date" name="start_date" required>
+        </div>
+        <div class="mb-3">
+            <label for="delete_staff" class="form-label">删除人员</label>
+            <select class="form-control" id="delete_staff" name="delete_staff">
+                <option value="">无</option>
+                {% for s in staff %}
+                    <option value="{{ s.name }}">{{ s.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="new_staff" class="form-label">新增人员</label>
+            <input type="text" class="form-control" id="new_staff" name="new_staff">
+        </div>
+        <button type="submit" class="btn btn-primary">更新</button>
+    </form>
+{% endblock %}

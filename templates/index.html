@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>{{ year }} 年值班表</h2>
+    <form method="GET" class="mb-3">
+        <label for="year" class="form-label">选择年份：</label>
+        <input type="number" id="year" name="year" value="{{ year }}" min="2000" max="2100" class="form-control d-inline w-auto">
+        <button type="submit" class="btn btn-primary">查询</button>
+    </form>
+    {% if is_admin %}
+        <form method="POST" action="{{ url_for('init_schedule') }}" class="mb-3">
+            <input type="hidden" name="year" value="{{ year }}">
+            <button type="submit" class="btn btn-primary">初始化排班</button>
+            <a href="{{ url_for('update_schedule') }}" class="btn btn-secondary">更新排班</a>
+        </form>
+        <a href="{{ url_for('logout') }}" class="btn btn-danger">退出登录</a>
+    {% else %}
+        <a href="{{ url_for('login') }}" class="btn btn-success">管理员登录</a>
+    {% endif %}
+    <div class="row">
+        {% for month in range(1, 13) %}
+            <div class="col-md-4 mb-4">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr><th colspan="7">{{ month }} 月</th></tr>
+                        <tr><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th><th>日</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for week in monthly_calendars[month] %}
+                            <tr>
+                                {% for day in week %}
+                                    {% if day == 0 %}
+                                        <td></td>
+                                    {% else %}
+                                        {% set schedule = monthly_schedules[month].get(day, {'name': '', 'color': ''}) %}
+                                        <td class="schedule-cell" 
+                                            data-date="{{ year }}-{{ '%02d'|format(month) }}-{{ '%02d'|format(day) }}"
+                                            {% if schedule.name %} 
+                                                style="background-color: {{ schedule.color }}"
+                                                {% if is_admin %} 
+                                                    draggable="true" 
+                                                    ondragstart="drag(event)" 
+                                                    ondrop="drop(event)" 
+                                                    ondragover="allowDrop(event)"
+                                                {% endif %}
+                                            {% endif %}>
+                                            {{ day }}<br>{{ schedule.name }}
+                                        </td>
+                                    {% endif %}
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endfor %}
+    </div>
+
+    {% if is_admin %}
+    <script>
+        function allowDrop(ev) {
+            ev.preventDefault();
+        }
+
+        function drag(ev) {
+            ev.dataTransfer.setData("text", ev.target.getAttribute('data-date'));
+        }
+
+        function drop(ev) {
+            ev.preventDefault();
+            var date1 = ev.dataTransfer.getData("text");
+            var date2 = ev.target.getAttribute('data-date');
+            
+            fetch('/swap', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `date1=${date1}&date2=${date2}`
+            })
+            .then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('对调失败：' + response.statusText);
+                }
+            })
+            .catch(error => {
+                alert('对调失败：' + error);
+            });
+        }
+    </script>
+    {% endif %}
+{% endblock %}
